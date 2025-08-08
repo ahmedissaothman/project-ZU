@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,7 +13,6 @@ import {
   Alert,
   TextInput,
   Modal,
-  KeyboardAvoidingView,
 } from 'react-native';
 import { globalStyles } from '../../styles/globalStyles';
 import { COLORS } from '../../utils/constants';
@@ -44,10 +43,57 @@ const MedicineManagement = ({ navigation }) => {
     name: '',
     dosage_form: '',
     strength: '',
-    category_id: 1,
-    company_id: 1,
+    category_id: null,
+    company_id: null,
     requires_prescription: false,
   });
+
+  // Categories and companies data
+  const [categories, setCategories] = useState([]);
+  const [companies, setCompanies] = useState([]);
+
+  useEffect(() => {
+    fetchMedicines();
+    fetchCategories();
+    fetchCompanies();
+  }, []);
+
+  const fetchCategories = async () => {
+    try {
+      // You may need to create this endpoint or use a default list
+      const defaultCategories = [
+        { id: 1, name: 'Pain Relief' },
+        { id: 2, name: 'Antibiotics' },
+        { id: 3, name: 'Vitamins' },
+        { id: 4, name: 'Heart Medication' },
+        { id: 5, name: 'Diabetes' },
+        { id: 6, name: 'Cold & Flu' },
+      ];
+      setCategories(defaultCategories);
+      console.log('Categories loaded:', defaultCategories);
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+      setCategories([]);
+    }
+  };
+
+  const fetchCompanies = async () => {
+    try {
+      // You may need to create this endpoint or use a default list
+      const defaultCompanies = [
+        { id: 1, name: 'PharmaCorp' },
+        { id: 2, name: 'MediCare' },
+        { id: 3, name: 'HealthPlus' },
+        { id: 4, name: 'BioMed' },
+        { id: 5, name: 'Global Pharma' },
+      ];
+      setCompanies(defaultCompanies);
+      console.log('Companies loaded:', defaultCompanies);
+    } catch (error) {
+      console.error('Error fetching companies:', error);
+      setCompanies([]);
+    }
+  };
 
   useEffect(() => {
     fetchMedicines();
@@ -84,8 +130,8 @@ const MedicineManagement = ({ navigation }) => {
       name: '',
       dosage_form: '',
       strength: '',
-      category_id: 1,
-      company_id: 1,
+      category_id: null, // Start with no selection
+      company_id: null,  // Start with no selection
       requires_prescription: false,
     });
   };
@@ -102,9 +148,9 @@ const MedicineManagement = ({ navigation }) => {
       name: medicine.name || '',
       dosage_form: medicine.dosage_form || '',
       strength: medicine.strength || '',
-      category_id: medicine.category_id || 1,
-      company_id: medicine.company_id || 1,
-      requires_prescription: medicine.requires_prescription || false,
+      category_id: medicine.category_id || null,
+      company_id: medicine.company_id || null,
+      requires_prescription: Boolean(medicine.requires_prescription),
     });
     setIsEditing(true);
     setModalVisible(true);
@@ -116,31 +162,80 @@ const MedicineManagement = ({ navigation }) => {
   };
 
   const saveMedicine = async () => {
+    // Validation
     if (!form.name.trim()) {
       Alert.alert('Error', 'Medicine name is required');
       return;
     }
 
+    if (!form.category_id) {
+      Alert.alert('Error', 'Please select a category');
+      return;
+    }
+
+    if (!form.company_id) {
+      Alert.alert('Error', 'Please select a company');
+      return;
+    }
+
     try {
       setIsLoading(true);
+      
+      // Prepare the payload according to API documentation
+      const payload = {
+        name: form.name.trim(),
+        dosage_form: form.dosage_form.trim(),
+        strength: form.strength.trim(),
+        category_id: parseInt(form.category_id),
+        company_id: parseInt(form.company_id),
+        requires_prescription: Boolean(form.requires_prescription)
+      };
+
+      console.log('Current form state:', form); // Debug log
+      console.log('Sending payload:', payload); // Debug log
+
       if (isEditing && selectedMedicine) {
         // Update medicine
-        await api.put(`/medicines/${selectedMedicine.id}`, form);
+        const response = await api.put(`/medicines/${selectedMedicine.id}`, payload);
+        console.log('Update response:', response.data);
+        
+        // Update local state
         setMedicines(medicines.map(m =>
-          m.id === selectedMedicine.id ? { ...m, ...form } : m
+          m.id === selectedMedicine.id 
+            ? { 
+                ...m, 
+                ...payload,
+                category_name: categories.find(c => c.id === payload.category_id)?.name,
+                company_name: companies.find(c => c.id === payload.company_id)?.name
+              } 
+            : m
         ));
         Alert.alert('Success', 'Medicine updated successfully');
       } else {
         // Create medicine
-        const response = await api.post('/medicines', form);
-        setMedicines([...medicines, response.data]);
+        const response = await api.post('/medicines', payload);
+        console.log('Create response:', response.data);
+        
+        // Add the new medicine to local state with additional info
+        const newMedicine = {
+          ...response.data,
+          category_name: categories.find(c => c.id === payload.category_id)?.name,
+          company_name: companies.find(c => c.id === payload.company_id)?.name
+        };
+        
+        setMedicines([...medicines, newMedicine]);
         Alert.alert('Success', 'Medicine added successfully');
       }
+      
       setModalVisible(false);
       resetForm();
     } catch (error) {
       console.error('Error saving medicine:', error);
-      Alert.alert('Error', 'Failed to save medicine');
+      console.error('Error response:', error.response?.data);
+      
+      // Show more specific error message
+      const errorMessage = error.response?.data?.error || 'Failed to save medicine';
+      Alert.alert('Error', errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -162,23 +257,6 @@ const MedicineManagement = ({ navigation }) => {
       setIsLoading(false);
     }
   };
-
-  // Memoized handlers to prevent re-renders
-  const handleNameChange = useCallback((text) => {
-    setForm(prev => ({ ...prev, name: text }));
-  }, []);
-
-  const handleDosageFormChange = useCallback((text) => {
-    setForm(prev => ({ ...prev, dosage_form: text }));
-  }, []);
-
-  const handleStrengthChange = useCallback((text) => {
-    setForm(prev => ({ ...prev, strength: text }));
-  }, []);
-
-  const handlePrescriptionToggle = useCallback((value) => {
-    setForm(prev => ({ ...prev, requires_prescription: value }));
-  }, []);
 
   const MedicineCard = ({ medicine, index }) => (
     <View style={styles.medicineCard}>
@@ -217,35 +295,21 @@ const MedicineManagement = ({ navigation }) => {
   );
 
   const FormModal = () => (
-    <Modal 
-      visible={modalVisible} 
-      transparent 
-      animationType="slide"
-      onRequestClose={() => setModalVisible(false)}
-    >
-      <KeyboardAvoidingView 
-        style={styles.modalOverlay}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
+    <Modal visible={modalVisible} transparent animationType="slide">
+      <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
           <Text style={styles.modalTitle}>
             {isEditing ? 'Edit Medicine' : 'Add New Medicine'}
           </Text>
 
-          <ScrollView 
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-          >
+          <ScrollView showsVerticalScrollIndicator={false}>
             <View style={styles.formGroup}>
               <Text style={styles.label}>Medicine Name *</Text>
               <TextInput
                 style={styles.input}
                 value={form.name}
-                onChangeText={handleNameChange}
+                onChangeText={(text) => setForm({...form, name: text})}
                 placeholder="Enter medicine name"
-                placeholderTextColor="#999"
-                autoCorrect={false}
-                autoCapitalize="words"
               />
             </View>
 
@@ -254,11 +318,8 @@ const MedicineManagement = ({ navigation }) => {
               <TextInput
                 style={styles.input}
                 value={form.dosage_form}
-                onChangeText={handleDosageFormChange}
+                onChangeText={(text) => setForm({...form, dosage_form: text})}
                 placeholder="e.g., Tablet, Capsule, Syrup"
-                placeholderTextColor="#999"
-                autoCorrect={false}
-                autoCapitalize="words"
               />
             </View>
 
@@ -267,10 +328,8 @@ const MedicineManagement = ({ navigation }) => {
               <TextInput
                 style={styles.input}
                 value={form.strength}
-                onChangeText={handleStrengthChange}
+                onChangeText={(text) => setForm({...form, strength: text})}
                 placeholder="e.g., 500mg, 250ml"
-                placeholderTextColor="#999"
-                autoCorrect={false}
               />
             </View>
 
@@ -282,7 +341,7 @@ const MedicineManagement = ({ navigation }) => {
                     styles.switchOption,
                     !form.requires_prescription && styles.switchActive
                   ]}
-                  onPress={() => handlePrescriptionToggle(false)}
+                  onPress={() => setForm({...form, requires_prescription: false})}
                 >
                   <Text style={[
                     styles.switchText,
@@ -294,7 +353,7 @@ const MedicineManagement = ({ navigation }) => {
                     styles.switchOption,
                     form.requires_prescription && styles.switchActive
                   ]}
-                  onPress={() => handlePrescriptionToggle(true)}
+                  onPress={() => setForm({...form, requires_prescription: true})}
                 >
                   <Text style={[
                     styles.switchText,
@@ -308,10 +367,7 @@ const MedicineManagement = ({ navigation }) => {
           <View style={styles.modalActions}>
             <TouchableOpacity
               style={[styles.modalButton, styles.cancelButton]}
-              onPress={() => {
-                setModalVisible(false);
-                resetForm();
-              }}
+              onPress={() => setModalVisible(false)}
             >
               <Text style={styles.cancelButtonText}>Cancel</Text>
             </TouchableOpacity>
@@ -327,17 +383,12 @@ const MedicineManagement = ({ navigation }) => {
             </TouchableOpacity>
           </View>
         </View>
-      </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 
   const DeleteModal = () => (
-    <Modal 
-      visible={deleteModalVisible} 
-      transparent 
-      animationType="fade"
-      onRequestClose={() => setDeleteModalVisible(false)}
-    >
+    <Modal visible={deleteModalVisible} transparent animationType="fade">
       <View style={styles.modalOverlay}>
         <View style={styles.deleteModalContent}>
           <Text style={styles.deleteModalTitle}>Delete Medicine</Text>
@@ -392,7 +443,6 @@ const MedicineManagement = ({ navigation }) => {
         <TextInput
           style={styles.searchInput}
           placeholder="Search medicines..."
-          placeholderTextColor="#999"
           value={searchQuery}
           onChangeText={setSearchQuery}
         />
@@ -608,7 +658,7 @@ const styles = StyleSheet.create({
     borderRadius: wp(3),
     padding: wp(5),
     width: wp(90),
-    maxHeight: hp(80),
+    maxHeight: hp(85),
   },
   deleteModalContent: {
     backgroundColor: '#fff',
@@ -654,19 +704,19 @@ const styles = StyleSheet.create({
     paddingVertical: hp(1.2),
     fontSize: responsiveFontSize(14),
     backgroundColor: '#f9f9f9',
-    color: '#333',
   },
   switchContainer: {
     flexDirection: 'row',
     backgroundColor: '#f0f0f0',
-    borderRadius: wp(1),
-    padding: wp(0.5),
+    borderRadius: wp(2),
+    padding: wp(1),
+    marginTop: hp(0.5),
   },
   switchOption: {
     flex: 1,
-    paddingVertical: hp(1),
+    paddingVertical: hp(1.2),
     alignItems: 'center',
-    borderRadius: wp(0.5),
+    borderRadius: wp(1.5),
   },
   switchActive: {
     backgroundColor: COLORS.primary,
@@ -674,10 +724,68 @@ const styles = StyleSheet.create({
   switchText: {
     fontSize: responsiveFontSize(14),
     color: '#666',
+    fontWeight: '500',
   },
   switchTextActive: {
     color: '#fff',
+    fontWeight: '700',
+  },
+  selectorContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginVertical: hp(1),
+  },
+  selectorOption: {
+    paddingVertical: hp(1),
+    paddingHorizontal: wp(3),
+    borderRadius: wp(1.5),
+    borderWidth: 2,
+    borderColor: '#ddd',
+    backgroundColor: '#fff',
+    marginRight: wp(2),
+    marginBottom: hp(1),
+    minWidth: wp(20),
+    alignItems: 'center',
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
+  },
+  selectorOptionSelected: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+    elevation: 3,
+    shadowOpacity: 0.2,
+  },
+  selectorText: {
+    fontSize: responsiveFontSize(13),
+    color: '#333',
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  selectorTextSelected: {
+    color: '#fff',
+    fontWeight: '700',
+  },
+  helperText: {
+    fontSize: responsiveFontSize(12),
+    color: '#666',
+    marginBottom: hp(0.8),
+    fontStyle: 'italic',
+  },
+  selectedText: {
+    fontSize: responsiveFontSize(14),
+    color: COLORS.success,
+    marginTop: hp(0.5),
     fontWeight: '600',
+    backgroundColor: '#f0f8f0',
+    paddingHorizontal: wp(2),
+    paddingVertical: hp(0.5),
+    borderRadius: wp(1),
+  },
+  horizontalScrollContainer: {
+    maxHeight: hp(12),
   },
   modalActions: {
     flexDirection: 'row',
