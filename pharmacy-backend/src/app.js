@@ -44,6 +44,15 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
+// Add these imports
+const categoriesRoutes = require('./routes/categories');
+const companiesRoutes = require('./routes/companies');
+
+// Add these route middlewares
+app.use('/api/categories', categoriesRoutes);
+app.use('/api/companies', companiesRoutes);
+
+
 // Error handling
 app.use(errorHandler);
 

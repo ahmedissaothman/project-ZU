@@ -80,32 +80,51 @@ const AdminDashboard = ({ navigation }) => {
     setIsLoading(true);
     setError(null);
     try {
+      console.log('Fetching dashboard data...');
+      
       // Fetch users data
-      const usersResponse = await api.get('/users');
-      console.log('Users Response:', usersResponse.data); // Debug log
-      
-      // Process user statistics
-      const users = usersResponse.data || [];
-      const totalUsers = users.length;
-      
-      // Calculate role distribution
-      const roleDistribution = users.reduce((acc, user) => {
-        const role = user.role || 'Unknown';
-        acc[role] = (acc[role] || 0) + 1;
-        return acc;
-      }, {});
+      try {
+        console.log('Fetching users from /api/users');
+        const usersResponse = await api.get('/users');
+        console.log('Users fetched successfully:', usersResponse.data?.length || 0, 'users');
+        
+        // Process user statistics
+        const users = usersResponse.data || [];
+        const totalUsers = users.length;
+        
+        // Calculate role distribution
+        const roleDistribution = users.reduce((acc, user) => {
+          const role = user.role || 'Unknown';
+          acc[role] = (acc[role] || 0) + 1;
+          return acc;
+        }, {});
 
-      setUserStats({
-        totalUsers: totalUsers,
-        roles: roleDistribution,
-        users: users // Store all users data if needed
-      });
+        setUserStats({
+          totalUsers: totalUsers,
+          roles: roleDistribution,
+          users: users
+        });
+      } catch (userError) {
+        console.error('Error fetching users:', userError.response?.status, userError.message);
+        setUserStats({
+          totalUsers: 0,
+          roles: {},
+          users: []
+        });
+      }
 
       // Fetch other system stats
       try {
+        console.log('Fetching sales and inventory reports...');
         const [salesResponse, inventoryResponse] = await Promise.all([
-          api.get('/reports/sales?period=daily').catch(err => ({ data: { total_sales: '$0' } })),
-          api.get('/reports/inventory').catch(err => ({ data: {} })),
+          api.get('/reports/sales?period=daily').catch(err => {
+            console.log('Sales report not available:', err.response?.status);
+            return { data: { total_sales: '$0' } };
+          }),
+          api.get('/reports/inventory').catch(err => {
+            console.log('Inventory report not available:', err.response?.status);
+            return { data: {} };
+          }),
         ]);
 
         setSystemStats({
@@ -114,7 +133,6 @@ const AdminDashboard = ({ navigation }) => {
         });
       } catch (statsError) {
         console.warn('Error fetching system stats:', statsError);
-        // Set default values if stats endpoints fail
         setSystemStats({
           sales: { total_sales: '$0' },
           inventory: {}
@@ -123,7 +141,7 @@ const AdminDashboard = ({ navigation }) => {
 
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
-      setError('Failed to load dashboard data');
+      setError('Failed to load some dashboard data');
       
       // Set default values on error
       setUserStats({
@@ -145,7 +163,7 @@ const AdminDashboard = ({ navigation }) => {
     { title: 'System Reports', screen: 'SalesReport', color: COLORS.success },
     { title: 'Database Backup', action: 'backup', color: COLORS.warning },
     { title: 'System Settings', screen: 'Settings', color: COLORS.info },
-    { title: 'Medicine Management', screen: 'MedicineManagement', color: COLORS.secondary },
+    { title: 'Medicine Management', screen: 'MedicineList', color: COLORS.secondary },
     { title: 'All Notifications', screen: 'Notifications', color: COLORS.text },
   ];
 

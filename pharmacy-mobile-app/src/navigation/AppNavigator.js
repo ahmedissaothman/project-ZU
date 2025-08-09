@@ -18,7 +18,7 @@ import DeliveryDashboard from '../screens/dashboard/DeliveryDashboard';
 import UserManagement from '../screens/dashboard/UserManagement';
 
 // Other Screens
-import MedicineManagement from '../screens/medicines/MedicineManagement';
+//import MedicineManagement from '../screens/medicines/MedicineManagement';
 
 // Other Screens
 import MedicineListScreen from '../screens/medicines/MedicineListScreen';
@@ -137,26 +137,9 @@ const AppNavigator = () => {
           />
           
           {/* Medicine Screens */}
-          <Stack.Screen 
-            name="MedicineList" 
-            component={MedicineListScreen}
-            options={{ title: 'Medicines' }}
-          />
-          <Stack.Screen 
-            name="MedicineManagement" 
-            component={MedicineManagement}
-            options={{ title: 'Medicine Management' }}
-          />
-          <Stack.Screen 
-            name="MedicineDetail" 
-            component={MedicineDetailScreen}
-            options={{ title: 'Medicine Details' }}
-          />
-          <Stack.Screen 
-            name="AddMedicine" 
-            component={AddMedicineScreen}
-            options={{ title: 'Add Medicine' }}
-          />
+          <Stack.Screen name="MedicineList" component={MedicineListScreen} />
+          <Stack.Screen name="MedicineDetail" component={MedicineDetailScreen} />
+          <Stack.Screen name="AddMedicine" component={AddMedicineScreen} />
           
           {/* Order Screens */}
           <Stack.Screen 
